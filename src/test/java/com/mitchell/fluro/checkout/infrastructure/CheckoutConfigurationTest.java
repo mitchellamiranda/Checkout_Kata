@@ -4,6 +4,11 @@ import com.mitchell.fluro.checkout.application.checkout.Checkout;
 import com.mitchell.fluro.checkout.application.checkout.ICheckout;
 import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Money;
+import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
+import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
+import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
+import com.mitchell.fluro.checkout.domain.promotion.PromotionResult;
 import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
 import com.mitchell.fluro.checkout.domain.service.IPromotionOptimizer;
 
@@ -34,7 +39,7 @@ class CheckoutConfigurationTest {
                 List.of(new PricingProperties.MultiPrice("X", 3, 250L)),
                 List.of(new PricingProperties.BuyNGetOneFree("Y", 1)),
                 List.of(new PricingProperties.MealDeal(Map.of("X", 1, "Z", 1), 125L)));
-        ICheckout checkout = new Checkout(configuration.pricingRules(properties), pricingEngine);
+        ICheckout checkout = new Checkout(configuration.pricingRules(properties, List.of()), pricingEngine);
         for (String sku : List.of("X", "X", "X", "X", "Y", "Y", "Z")) {
             checkout.scan(sku);
         }
@@ -44,7 +49,7 @@ class CheckoutConfigurationTest {
     @Test
     void supportsACatalogueWithoutPromotions() {
         PricingProperties properties = new PricingProperties(Map.of("A", 10L), List.of(), List.of(), List.of());
-        ICheckout checkout = new Checkout(configuration.pricingRules(properties), pricingEngine);
+        ICheckout checkout = new Checkout(configuration.pricingRules(properties, List.of()), pricingEngine);
         checkout.scan("A");
         assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(10));
     }
@@ -53,7 +58,7 @@ class CheckoutConfigurationTest {
     void rejectsUnknownPromotionSkusAtConfigurationTime() {
         PricingProperties properties = new PricingProperties(Map.of("A", 10L),
                 List.of(new PricingProperties.MultiPrice("Z", 2, 10L)), List.of(), List.of());
-        assertThatThrownBy(() -> configuration.pricingRules(properties))
+        assertThatThrownBy(() -> configuration.pricingRules(properties, List.of()))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown SKU: Z");
     }
 
@@ -118,6 +123,40 @@ class CheckoutConfigurationTest {
                     assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
                     assertThat(optimizedQuantities).containsExactly(1);
                 });
+    }
+
+    @Test
+    void discoversMultiplePromotionBeansWithoutChangingTheCompositionRoot() {
+        PricingRule singleRule = new PricingRule(Map.of("X", 1), Money.ofPence(30));
+        IPromotion single = basket -> PromotionResult.eligible(singleRule, basket);
+        IPromotion pair = new MultiPricePromotion("X", 2, Money.ofPence(50));
+        contextRunner.withBean("singleOffer", IPromotion.class, () -> single)
+                .withBean("pairOffer", IPromotion.class, () -> pair)
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    assertThat(context.getBean(PricingRules.class).promotions())
+                            .containsExactlyInAnyOrder(single, pair);
+                    ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                    checkout.scan("X");
+                    assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(30));
+                    checkout.scan("X");
+                    assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(50));
+                });
+    }
+
+    @Test
+    void combinesConfiguredAndInjectedPromotionsWithoutRetainingAMutableRegistrationList() {
+        PricingProperties properties = new PricingProperties(Map.of("X", 42L),
+                List.of(new PricingProperties.MultiPrice("X", 2, 70L)), List.of(), List.of());
+        IPromotion cheaperPair = new MultiPricePromotion("X", 2, Money.ofPence(50));
+        List<IPromotion> registrations = new ArrayList<>(List.of(cheaperPair));
+        PricingRules rules = configuration.pricingRules(properties, registrations);
+        registrations.clear();
+        assertThat(rules.promotions()).hasSize(2).contains(cheaperPair);
+        ICheckout checkout = new Checkout(rules, pricingEngine);
+        checkout.scan("X");
+        checkout.scan("X");
+        assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(50));
     }
 
     @Test

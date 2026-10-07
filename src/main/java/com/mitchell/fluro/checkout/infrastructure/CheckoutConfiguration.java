@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Configuration;
 public class CheckoutConfiguration {
 
     @Bean
-    public PricingRules pricingRules(PricingProperties properties) {
+    public PricingRules pricingRules(PricingProperties properties, List<IPromotion> additionalPromotions) {
         List<Item> items = properties.unitPrices().entrySet().stream()
                 .map(entry -> new Item(entry.getKey(), Money.ofPence(entry.getValue())))
                 .toList();
@@ -44,6 +44,7 @@ public class CheckoutConfiguration {
             offer.quantities().keySet().forEach(catalogue::item);
             promotions.add(new MealDealPromotion(offer.quantities(), Money.ofPence(offer.price())));
         });
+        promotions.addAll(additionalPromotions);
         return new PricingRules(items, promotions);
     }
 
