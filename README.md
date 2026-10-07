@@ -309,6 +309,25 @@ JUnit 5 and AssertJ tests cover unit prices, promotion boundaries, repetitions,
 remainders, invalid inputs, immutability, overflow and transaction isolation.
 Nested suites and parameterized scenarios keep the business cases readable.
 
+The suite uses the unit-test agent's named-case conventions, adapted to JUnit 5:
+`@ParameterizedTest` and `@MethodSource` replace JUnit 4 DataProvider runners.
+Test methods follow `<methodUnderTest>Test`; providers follow
+`<methodUnderTest>DataProvider`. Constructor cases use `constructorTest` and
+`constructorDataProvider`, with nested contexts separating scenario groups.
+
+Providers preallocate `Object[][]` and construct each row through the test-only
+`TestCaseBuilder`. Rows contain a named `dataValues` map, an `expectedCalls` map
+and a typed expected result, rather than positional input values. The builder
+copies both maps and resets them to their defaults after each case. Mutable
+fixtures are created per case; copying the maps is not a deep-copy mechanism.
+Conditional setup and generated scenarios belong in providers or setup helpers,
+leaving test bodies focused on invocation and assertions.
+
+Fixtures are local rather than shared test-class fields. Recording-double
+interaction counts come from `expectedCalls`; cases without interactions use
+an empty map. Spring integration retains JUnit 5 method-parameter injection
+where needed, without introducing injected fields, JUnit 4 or Mockito.
+
 Interaction tests include greedy counterexamples, competing meal/free-item
 offers, duplicate rules, free bundles and scan-order permutations.
 An independent exhaustive reference implementation enumerates offer counts for
