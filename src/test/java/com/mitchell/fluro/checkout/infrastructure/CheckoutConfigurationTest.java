@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -71,5 +72,18 @@ class CheckoutConfigurationTest {
                 .isInstanceOf(NullPointerException.class);
         assertThatThrownBy(() -> new CheckoutFactory(new PricingRules(List.of()), null))
                 .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void bindsAnExternalCatalogueWithExplicitlyEmptyPromotionLists() {
+        new ApplicationContextRunner().withUserConfiguration(CheckoutConfiguration.class)
+                .withPropertyValues("checkout.unit-prices.X=42", "checkout.multi-prices=",
+                        "checkout.buy-n-get-one-free=", "checkout.meal-deals=")
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    Checkout checkout = context.getBean(CheckoutFactory.class).create();
+                    checkout.scan("X");
+                    assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
+                });
     }
 }
