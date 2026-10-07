@@ -7,7 +7,7 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
 import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
-import com.mitchell.fluro.checkout.domain.promotion.Promotion;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 import com.mitchell.fluro.checkout.domain.service.PricingEngine;
 
 import java.util.ArrayList;
@@ -27,7 +27,7 @@ public class CheckoutConfiguration {
                 .map(entry -> new Item(entry.getKey(), Money.ofPence(entry.getValue())))
                 .toList();
         PricingRules catalogue = new PricingRules(items);
-        List<Promotion> promotions = new ArrayList<>();
+        List<IPromotion> promotions = new ArrayList<>();
         properties.multiPrices().forEach(offer -> {
             catalogue.item(offer.sku());
             promotions.add(new MultiPricePromotion(offer.sku(), offer.quantity(), Money.ofPence(offer.price())));

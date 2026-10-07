@@ -6,7 +6,7 @@ import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
-import com.mitchell.fluro.checkout.domain.promotion.Promotion;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 
 import java.time.Duration;
 import java.util.List;
@@ -29,7 +29,7 @@ class LargeBasketTest {
                 new Item("C", Money.ofPence(25)), 1_000_000,
                 new Item("D", Money.ofPence(150)), 1_000_000,
                 new Item("E", Money.ofPence(200)), 1_000_000));
-        List<Promotion> promotions = List.of(
+        List<IPromotion> promotions = List.of(
                 new MultiPricePromotion("B", 2, Money.ofPence(125)),
                 new BuyNGetOneFreePromotion("C", 3),
                 new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300)));
@@ -40,7 +40,7 @@ class LargeBasketTest {
     @Test
     void searchesDeeplyOverlappingOffersWithoutRecursion() {
         Basket basket = new Basket(Map.of(new Item("A", Money.ofPence(100)), 20_000));
-        List<Promotion> promotions = List.of(
+        List<IPromotion> promotions = List.of(
                 new MultiPricePromotion("A", 2, Money.ofPence(120)),
                 new MultiPricePromotion("A", 3, Money.ofPence(160)));
         assertTimeout(Duration.ofSeconds(10),
@@ -50,7 +50,7 @@ class LargeBasketTest {
     @Test
     void supportsQuantitiesAndTotalsBeyondSignedIntArithmetic() {
         Basket basket = new Basket(Map.of(new Item("A", Money.ofPence(100)), Integer.MAX_VALUE));
-        Promotion pairs = new MultiPricePromotion("A", 2, Money.ofPence(150));
+        IPromotion pairs = new MultiPricePromotion("A", 2, Money.ofPence(150));
         assertThat(engine.calculate(basket, List.of(pairs))).isEqualTo(Money.ofPence(161_061_273_550L));
     }
 }

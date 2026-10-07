@@ -8,7 +8,7 @@ import com.mitchell.fluro.checkout.domain.model.Basket;
  * This describes offers, not an allocation; the pricing engine chooses quantities.
  */
 @FunctionalInterface
-public interface Promotion {
+public interface IPromotion {
 
     PromotionResult apply(Basket basket);
 }

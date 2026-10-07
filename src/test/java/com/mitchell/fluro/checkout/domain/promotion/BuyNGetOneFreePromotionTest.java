@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class BuyNGetOneFreePromotionTest {
 
     private static final Item C = new Item("C", Money.ofPence(25));
-    private final Promotion promotion = new BuyNGetOneFreePromotion("C", 3);
+    private final IPromotion promotion = new BuyNGetOneFreePromotion("C", 3);
 
     @ParameterizedTest(name = "{0} items cost {1} pence")
     @CsvSource({"0, 0", "1, 25", "2, 50", "3, 75", "4, 75", "5, 100",
@@ -48,7 +48,7 @@ class BuyNGetOneFreePromotionTest {
 
     @Test
     void supportsBuyOneGetOneFreeAndAlreadyFreeItems() {
-        Promotion buyOne = new BuyNGetOneFreePromotion("C", 1);
+        IPromotion buyOne = new BuyNGetOneFreePromotion("C", 1);
         assertThat(new PricingEngine().calculate(new Basket(Map.of(C, 5)), List.of(buyOne)))
                 .isEqualTo(Money.ofPence(75));
         assertThat(new PricingEngine().calculate(new Basket(Map.of(new Item("C", Money.ZERO), 4)),

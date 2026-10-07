@@ -130,7 +130,7 @@ All packages are beneath `com.mitchell.fluro.checkout`.
 | --- | --- |
 | `domain.model` | Immutable `Money`, `Item` and `Basket` value objects and invariants |
 | `domain.pricing` | Catalogue snapshot (`PricingRules`) and atomic bundle exchange (`PricingRule`) |
-| `domain.promotion` | `Promotion` strategies and immutable candidate results |
+| `domain.promotion` | `IPromotion` strategies and immutable candidate results |
 | `domain.service` | Unit valuation, offer coordination and exact allocation |
 | `application.checkout` | Stateful transaction orchestration and transaction factory |
 | `infrastructure` | Spring binding, configuration validation and dependency composition |
@@ -161,7 +161,7 @@ honour the immutability contract.
 ### Promotion engine: strategies, not condition chains
 
 ```java
-public interface Promotion {
+public interface IPromotion {
     PromotionResult apply(Basket basket);
 }
 ```
@@ -178,7 +178,7 @@ transaction's actual unit price. Meal deals support more than two SKUs and
 different quantities per SKU.
 
 The Strategy pattern isolates these variations. The pricing engine depends
-only on `Promotion` and bundle values; it has no promotion-type switches or
+only on `IPromotion` and bundle values; it has no promotion-type switches or
 `instanceof` dispatch.
 
 ### Pricing engine: why not greedy?
@@ -222,7 +222,7 @@ The supplied price list consists entirely of independent one-offer components.
 
 ## Extending the solution
 
-Add a new immutable `Promotion` implementation and register an instance in
+Add a new immutable `IPromotion` implementation and register an instance in
 the `PricingRules` promotion list. Existing promotion classes and the allocation
 engine remain unchanged: this is the Open/Closed boundary. The composition
 root is deliberately allowed to change when registering a new strategy.

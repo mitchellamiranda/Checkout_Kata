@@ -23,7 +23,7 @@ class MealDealPromotionTest {
 
     private static final Item D = new Item("D", Money.ofPence(150));
     private static final Item E = new Item("E", Money.ofPence(200));
-    private final Promotion promotion = new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300));
+    private final IPromotion promotion = new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300));
 
     @ParameterizedTest(name = "{0} D and {1} E cost {2} pence")
     @CsvSource({"0, 0, 0", "1, 0, 150", "0, 1, 200", "1, 1, 300", "2, 2, 600",
@@ -51,7 +51,7 @@ class MealDealPromotionTest {
     @Test
     void supportsDifferentQuantitiesAndMoreThanTwoSkus() {
         Item side = new Item("SIDE", Money.ofPence(50));
-        Promotion familyMeal = new MealDealPromotion(Map.of("D", 2, "E", 1, "SIDE", 3), Money.ofPence(500));
+        IPromotion familyMeal = new MealDealPromotion(Map.of("D", 2, "E", 1, "SIDE", 3), Money.ofPence(500));
         Basket basket = new Basket(Map.of(D, 5, E, 2, side, 7));
         assertThat(new PricingEngine().calculate(basket, List.of(familyMeal))).isEqualTo(Money.ofPence(1200));
     }
@@ -59,7 +59,7 @@ class MealDealPromotionTest {
     @Test
     void copiesTheConfiguration() {
         Map<String, Integer> quantities = new HashMap<>(Map.of("D", 1, "E", 1));
-        Promotion copied = new MealDealPromotion(quantities, Money.ofPence(300));
+        IPromotion copied = new MealDealPromotion(quantities, Money.ofPence(300));
         quantities.clear();
         assertThat(new PricingEngine().calculate(new Basket(Map.of(D, 1, E, 1)), List.of(copied)))
                 .isEqualTo(Money.ofPence(300));

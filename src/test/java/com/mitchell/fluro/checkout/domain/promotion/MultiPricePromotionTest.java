@@ -22,7 +22,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class MultiPricePromotionTest {
 
     private static final Item B = new Item("B", Money.ofPence(75));
-    private final Promotion promotion = new MultiPricePromotion("B", 2, Money.ofPence(125));
+    private final IPromotion promotion = new MultiPricePromotion("B", 2, Money.ofPence(125));
 
     @ParameterizedTest(name = "{0} items cost {1} pence")
     @CsvSource({"0, 0", "1, 75", "2, 125", "3, 200", "4, 250", "5, 325", "10, 625"})
@@ -43,7 +43,7 @@ class MultiPricePromotionTest {
     @Test
     void supportsDifferentSkusQuantitiesAndPrices() {
         Item apple = new Item("APPLE", Money.ofPence(50));
-        Promotion revised = new MultiPricePromotion("APPLE", 3, Money.ofPence(130));
+        IPromotion revised = new MultiPricePromotion("APPLE", 3, Money.ofPence(130));
         assertThat(new PricingEngine().calculate(new Basket(Map.of(apple, 4)), List.of(revised)))
                 .isEqualTo(Money.ofPence(180));
         assertThat(promotion.apply(new Basket(Map.of(apple, 4)))).isEqualTo(PromotionResult.NONE);

@@ -6,7 +6,7 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
 
 import java.util.Map;
 
-public final class MultiPricePromotion implements Promotion {
+public final class MultiPricePromotion implements IPromotion {
 
     private final PricingRule rule;
 

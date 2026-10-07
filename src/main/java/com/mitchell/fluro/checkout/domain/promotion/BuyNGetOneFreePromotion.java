@@ -8,7 +8,7 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
 import java.util.List;
 import java.util.Map;
 
-public final class BuyNGetOneFreePromotion implements Promotion {
+public final class BuyNGetOneFreePromotion implements IPromotion {
 
     private final String sku;
     private final int paidQuantity;

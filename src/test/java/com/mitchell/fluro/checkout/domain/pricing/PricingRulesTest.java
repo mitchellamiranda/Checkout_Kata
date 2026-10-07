@@ -2,7 +2,7 @@ package com.mitchell.fluro.checkout.domain.pricing;
 
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
-import com.mitchell.fluro.checkout.domain.promotion.Promotion;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.PromotionResult;
 
 import java.util.ArrayList;
@@ -28,8 +28,8 @@ class PricingRulesTest {
 
     @Test
     void snapshotsPromotionRegistrations() {
-        Promotion promotion = basket -> PromotionResult.NONE;
-        List<Promotion> source = new ArrayList<>(List.of(promotion));
+        IPromotion promotion = basket -> PromotionResult.NONE;
+        List<IPromotion> source = new ArrayList<>(List.of(promotion));
         PricingRules rules = new PricingRules(List.of(A), source);
         source.clear();
         assertThat(rules.promotions()).containsExactly(promotion);

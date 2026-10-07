@@ -1,7 +1,7 @@
 package com.mitchell.fluro.checkout.domain.pricing;
 
 import com.mitchell.fluro.checkout.domain.model.Item;
-import com.mitchell.fluro.checkout.domain.promotion.Promotion;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -12,13 +12,13 @@ import java.util.Objects;
 public final class PricingRules {
 
     private final Map<String, Item> items;
-    private final List<Promotion> promotions;
+    private final List<IPromotion> promotions;
 
     public PricingRules(Collection<Item> items) {
         this(items, List.of());
     }
 
-    public PricingRules(Collection<Item> items, Collection<Promotion> promotions) {
+    public PricingRules(Collection<Item> items, Collection<IPromotion> promotions) {
         Map<String, Item> catalogue = new HashMap<>();
         for (Item item : items) {
             Objects.requireNonNull(item, "Catalogue items are required");
@@ -30,7 +30,7 @@ public final class PricingRules {
         this.promotions = List.copyOf(promotions);
     }
 
-    public List<Promotion> promotions() {
+    public List<IPromotion> promotions() {
         return promotions;
     }
 

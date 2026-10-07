@@ -6,7 +6,7 @@ import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
-import com.mitchell.fluro.checkout.domain.promotion.Promotion;
+import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,7 +43,7 @@ class PricingOptimalityTest {
         long largerPrice = random.nextInt(500);
         long abPrice = random.nextInt(400);
         long bcPrice = random.nextInt(400);
-        List<Promotion> promotions = new ArrayList<>(List.of(
+        List<IPromotion> promotions = new ArrayList<>(List.of(
                 new MultiPricePromotion("A", pairSize, Money.ofPence(pairPrice)),
                 new MultiPricePromotion("A", largerSize, Money.ofPence(largerPrice)),
                 new BuyNGetOneFreePromotion("B", paid),
