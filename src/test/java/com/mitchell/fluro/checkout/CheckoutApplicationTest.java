@@ -1,7 +1,7 @@
 package com.mitchell.fluro.checkout;
 
-import com.mitchell.fluro.checkout.application.checkout.Checkout;
-import com.mitchell.fluro.checkout.application.checkout.CheckoutFactory;
+import com.mitchell.fluro.checkout.application.checkout.ICheckout;
+import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Money;
 
 import org.junit.jupiter.api.Test;
@@ -21,8 +21,8 @@ class CheckoutApplicationTest {
     }
 
     @Test
-    void wiresConfiguredRulesIntoIsolatedTransactions(@Autowired CheckoutFactory factory) {
-        Checkout checkout = factory.create();
+    void wiresConfiguredRulesIntoIsolatedTransactions(@Autowired ICheckoutFactory factory) {
+        ICheckout checkout = factory.create();
         checkout.scan("B");
         checkout.scan("A");
         checkout.scan("B");
@@ -31,8 +31,8 @@ class CheckoutApplicationTest {
     }
 
     @Test
-    void loadsAllExercisePromotionsFromConfiguration(@Autowired CheckoutFactory factory) {
-        Checkout checkout = factory.create();
+    void loadsAllExercisePromotionsFromConfiguration(@Autowired ICheckoutFactory factory) {
+        ICheckout checkout = factory.create();
         for (String sku : new String[]{"A", "B", "B", "C", "C", "C", "C", "D", "E"}) {
             checkout.scan(sku);
         }

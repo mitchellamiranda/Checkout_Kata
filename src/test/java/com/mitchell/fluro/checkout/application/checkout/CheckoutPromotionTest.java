@@ -6,6 +6,9 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
 import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class CheckoutPromotionTest {
 
+    private final IPricingEngine pricingEngine = new PricingEngine(new PromotionOptimizer());
     private static final List<Item> ITEMS = List.of(
             new Item("A", Money.ofPence(50)), new Item("B", Money.ofPence(75)),
             new Item("C", Money.ofPence(25)), new Item("D", Money.ofPence(150)),
@@ -43,14 +47,14 @@ class CheckoutPromotionTest {
                 "BB, 125", "CCC, 75", "CCCC, 75", "DE, 300", "BAB, 175",
                 "ABCDE, 450", "ABBCCCCDE, 550", "AABBBBCCCCCCCCDDEE, 1100", "BBBCCCCCDDE, 750"})
         void combinesAllPromotionTypes(String scanned, long expected) {
-            Checkout checkout = new Checkout(exerciseRules);
+            ICheckout checkout = new Checkout(exerciseRules, pricingEngine);
             scan(checkout, scanned);
             assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(expected));
         }
 
         @Test
         void repricesTheWholeBasketAfterEveryScanWithoutConsumingOffers() {
-            Checkout checkout = new Checkout(exerciseRules);
+            ICheckout checkout = new Checkout(exerciseRules, pricingEngine);
             checkout.scan("B");
             assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(75));
             checkout.scan("A");
@@ -70,7 +74,7 @@ class CheckoutPromotionTest {
         List<String> scanned = new ArrayList<>("AABBBBBCCCCCCCCCDDDEE".chars()
                 .mapToObj(character -> String.valueOf((char) character)).toList());
         Collections.shuffle(scanned, new Random(seed));
-        Checkout checkout = new Checkout(exerciseRules);
+        ICheckout checkout = new Checkout(exerciseRules, pricingEngine);
         scanned.forEach(checkout::scan);
         assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(1350));
     }
@@ -84,7 +88,7 @@ class CheckoutPromotionTest {
             PricingRules rules = new PricingRules(ITEMS, List.of(
                     new BuyNGetOneFreePromotion("C", 3),
                     new MultiPricePromotion("C", 2, Money.ofPence(30))));
-            Checkout checkout = new Checkout(rules);
+            ICheckout checkout = new Checkout(rules, pricingEngine);
             scan(checkout, "CCCC");
             assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(60));
         }
@@ -95,7 +99,7 @@ class CheckoutPromotionTest {
             PricingRules rules = new PricingRules(ITEMS, List.of(
                     new BuyNGetOneFreePromotion("C", 3),
                     new MealDealPromotion(Map.of("C", 1, "D", 1), Money.ofPence(mealPrice))));
-            Checkout checkout = new Checkout(rules);
+            ICheckout checkout = new Checkout(rules, pricingEngine);
             scan(checkout, "CCCCD");
             assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(expected));
         }
@@ -106,7 +110,7 @@ class CheckoutPromotionTest {
             PricingRules rules = new PricingRules(ITEMS, List.of(
                     new MultiPricePromotion("D", 2, Money.ofPence(200)),
                     new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300))));
-            Checkout checkout = new Checkout(rules);
+            ICheckout checkout = new Checkout(rules, pricingEngine);
             scan(checkout, scanned);
             assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(expected));
         }
@@ -116,7 +120,7 @@ class CheckoutPromotionTest {
         return IntStream.range(0, 50);
     }
 
-    private static void scan(Checkout checkout, String scanned) {
+    private static void scan(ICheckout checkout, String scanned) {
         scanned.chars().mapToObj(character -> String.valueOf((char) character)).forEach(checkout::scan);
     }
 }

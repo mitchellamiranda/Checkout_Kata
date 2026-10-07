@@ -7,6 +7,7 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
 import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.PromotionResult;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -20,7 +21,7 @@ class PricingEngineTest {
 
     private static final Item A = new Item("A", Money.ofPence(100));
     private static final Item B = new Item("B", Money.ofPence(100));
-    private final PricingEngine engine = new PricingEngine();
+    private final IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
 
     @Test
     @DisplayName("Finds the global optimum rather than taking the biggest discount first")
@@ -105,6 +106,38 @@ class PricingEngineTest {
         IPromotion bc = offer(Map.of("B", 1, "C", 1), 1);
         assertThat(engine.calculate(basket, List.of(ab, cd, bc))).isEqualTo(Money.ofPence(201));
         assertThat(engine.calculate(basket, List.of(bc, cd, ab))).isEqualTo(Money.ofPence(201));
+    }
+
+    @Test
+    void passesDeduplicatedCandidatesToTheInjectedOptimizer() {
+        Basket basket = new Basket(Map.of(A, 2));
+        PricingRule rule = new PricingRule(Map.of("A", 2), Money.ofPence(150));
+        IPromotion promotion = ignored -> new PromotionResult(List.of(rule, rule));
+        List<List<PricingRule>> receivedRules = new ArrayList<>();
+        IPromotionOptimizer optimizer = (receivedBasket, candidates) -> {
+            assertThat(receivedBasket).isSameAs(basket);
+            receivedRules.add(candidates);
+            return Money.ofPence(50);
+        };
+        IPricingEngine injected = new PricingEngine(optimizer);
+        assertThat(injected.calculate(basket, List.of(promotion, promotion))).isEqualTo(Money.ofPence(150));
+        assertThat(receivedRules).containsExactly(List.of(rule));
+    }
+
+    @Test
+    void requiresAnOptimizer() {
+        assertThatThrownBy(() -> new PricingEngine(null))
+                .isInstanceOf(NullPointerException.class).hasMessage("Promotion optimizer is required");
+    }
+
+    @Test
+    void propagatesOptimizerFailures() {
+        IllegalStateException failure = new IllegalStateException("Allocation failed");
+        IPromotionOptimizer failing = (basket, rules) -> {
+            throw failure;
+        };
+        IPricingEngine injected = new PricingEngine(failing);
+        assertThatThrownBy(() -> injected.calculate(Basket.empty(), List.of())).isSameAs(failure);
     }
 
     private static IPromotion offer(Map<String, Integer> quantities, long price) {

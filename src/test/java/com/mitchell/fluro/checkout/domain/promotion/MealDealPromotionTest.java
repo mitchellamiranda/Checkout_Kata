@@ -4,7 +4,9 @@ import com.mitchell.fluro.checkout.domain.model.Basket;
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
 import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Meal deal: one D and one E cost 300p")
 class MealDealPromotionTest {
 
+    private final IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
     private static final Item D = new Item("D", Money.ofPence(150));
     private static final Item E = new Item("E", Money.ofPence(200));
     private final IPromotion promotion = new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300));
@@ -36,14 +39,14 @@ class MealDealPromotionTest {
         if (eCount > 0) {
             quantities.put(E, eCount);
         }
-        assertThat(new PricingEngine().calculate(new Basket(quantities), List.of(promotion)))
+        assertThat(engine.calculate(new Basket(quantities), List.of(promotion)))
                 .isEqualTo(Money.ofPence(expected));
     }
 
     @Test
     void leavesUnrelatedItemsAtTheirUnitPrice() {
         Basket basket = new Basket(Map.of(D, 2, E, 1, new Item("A", Money.ofPence(50)), 3));
-        assertThat(new PricingEngine().calculate(basket, List.of(promotion))).isEqualTo(Money.ofPence(600));
+        assertThat(engine.calculate(basket, List.of(promotion))).isEqualTo(Money.ofPence(600));
         assertThat(promotion.apply(basket).rules())
                 .containsExactly(new PricingRule(Map.of("D", 1, "E", 1), Money.ofPence(300)));
     }
@@ -53,7 +56,7 @@ class MealDealPromotionTest {
         Item side = new Item("SIDE", Money.ofPence(50));
         IPromotion familyMeal = new MealDealPromotion(Map.of("D", 2, "E", 1, "SIDE", 3), Money.ofPence(500));
         Basket basket = new Basket(Map.of(D, 5, E, 2, side, 7));
-        assertThat(new PricingEngine().calculate(basket, List.of(familyMeal))).isEqualTo(Money.ofPence(1200));
+        assertThat(engine.calculate(basket, List.of(familyMeal))).isEqualTo(Money.ofPence(1200));
     }
 
     @Test
@@ -61,7 +64,7 @@ class MealDealPromotionTest {
         Map<String, Integer> quantities = new HashMap<>(Map.of("D", 1, "E", 1));
         IPromotion copied = new MealDealPromotion(quantities, Money.ofPence(300));
         quantities.clear();
-        assertThat(new PricingEngine().calculate(new Basket(Map.of(D, 1, E, 1)), List.of(copied)))
+        assertThat(engine.calculate(new Basket(Map.of(D, 1, E, 1)), List.of(copied)))
                 .isEqualTo(Money.ofPence(300));
     }
 

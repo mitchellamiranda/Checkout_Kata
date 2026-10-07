@@ -6,11 +6,17 @@ import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
 import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
 
 import java.util.List;
+import java.util.Objects;
 
-public final class PricingEngine {
+public final class PricingEngine implements IPricingEngine {
 
-    private final PromotionOptimizer optimizer = new PromotionOptimizer();
+    private final IPromotionOptimizer optimizer;
 
+    public PricingEngine(IPromotionOptimizer optimizer) {
+        this.optimizer = Objects.requireNonNull(optimizer, "Promotion optimizer is required");
+    }
+
+    @Override
     public Money calculate(Basket basket, List<IPromotion> promotions) {
         Money unitTotal = basket.unitTotal();
         List<PricingRule> rules = promotions.stream()

@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeout;
 
 class LargeBasketTest {
 
-    private final PricingEngine engine = new PricingEngine();
+    private final IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
 
     @Test
     void pricesFiveMillionItemsWithoutEnumeratingIndependentCombinations() {

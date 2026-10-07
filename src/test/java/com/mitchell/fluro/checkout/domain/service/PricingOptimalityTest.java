@@ -57,7 +57,7 @@ class PricingOptimalityTest {
                 new ExpectedOffer(new int[]{0, 1, 1}, bcPrice));
         Money expected = Money.ofPence(enumerate(counts, prices, offers, 0));
         Basket basket = new Basket(items);
-        PricingEngine engine = new PricingEngine();
+        IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
         assertThat(engine.calculate(basket, promotions)).isEqualTo(expected);
         Collections.reverse(promotions);
         assertThat(engine.calculate(basket, promotions)).isEqualTo(expected);

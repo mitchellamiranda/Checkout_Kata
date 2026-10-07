@@ -1,6 +1,7 @@
 package com.mitchell.fluro.checkout.infrastructure;
 
 import com.mitchell.fluro.checkout.application.checkout.CheckoutFactory;
+import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
@@ -8,7 +9,10 @@ import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
+import com.mitchell.fluro.checkout.domain.service.IPromotionOptimizer;
 import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,12 +48,17 @@ public class CheckoutConfiguration {
     }
 
     @Bean
-    public PricingEngine pricingEngine() {
-        return new PricingEngine();
+    public IPromotionOptimizer promotionOptimizer() {
+        return new PromotionOptimizer();
     }
 
     @Bean
-    public CheckoutFactory checkoutFactory(PricingRules pricingRules, PricingEngine pricingEngine) {
+    public IPricingEngine pricingEngine(IPromotionOptimizer optimizer) {
+        return new PricingEngine(optimizer);
+    }
+
+    @Bean
+    public ICheckoutFactory checkoutFactory(PricingRules pricingRules, IPricingEngine pricingEngine) {
         return new CheckoutFactory(pricingRules, pricingEngine);
     }
 }

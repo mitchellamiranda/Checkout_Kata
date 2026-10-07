@@ -1,10 +1,11 @@
 package com.mitchell.fluro.checkout.infrastructure;
 
 import com.mitchell.fluro.checkout.application.checkout.Checkout;
-import com.mitchell.fluro.checkout.application.checkout.CheckoutFactory;
+import com.mitchell.fluro.checkout.application.checkout.ICheckout;
+import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Money;
-import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
-import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
+import com.mitchell.fluro.checkout.domain.service.IPromotionOptimizer;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -20,6 +21,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CheckoutConfigurationTest {
 
     private final CheckoutConfiguration configuration = new CheckoutConfiguration();
+    private final IPricingEngine pricingEngine = configuration.pricingEngine(configuration.promotionOptimizer());
+    private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+            .withUserConfiguration(CheckoutConfiguration.class)
+            .withPropertyValues("checkout.unit-prices.X=42", "checkout.multi-prices=",
+                    "checkout.buy-n-get-one-free=", "checkout.meal-deals=");
 
     @Test
     void constructsRulesFromAlternativeDataWithoutEngineChanges() {
@@ -28,7 +34,7 @@ class CheckoutConfigurationTest {
                 List.of(new PricingProperties.MultiPrice("X", 3, 250L)),
                 List.of(new PricingProperties.BuyNGetOneFree("Y", 1)),
                 List.of(new PricingProperties.MealDeal(Map.of("X", 1, "Z", 1), 125L)));
-        Checkout checkout = new Checkout(configuration.pricingRules(properties));
+        ICheckout checkout = new Checkout(configuration.pricingRules(properties), pricingEngine);
         for (String sku : List.of("X", "X", "X", "X", "Y", "Y", "Z")) {
             checkout.scan(sku);
         }
@@ -38,7 +44,7 @@ class CheckoutConfigurationTest {
     @Test
     void supportsACatalogueWithoutPromotions() {
         PricingProperties properties = new PricingProperties(Map.of("A", 10L), List.of(), List.of(), List.of());
-        Checkout checkout = new Checkout(configuration.pricingRules(properties));
+        ICheckout checkout = new Checkout(configuration.pricingRules(properties), pricingEngine);
         checkout.scan("A");
         assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(10));
     }
@@ -67,23 +73,50 @@ class CheckoutConfigurationTest {
     }
 
     @Test
-    void factoryRejectsMissingDependencies() {
-        assertThatThrownBy(() -> new CheckoutFactory(null, new PricingEngine()))
-                .isInstanceOf(NullPointerException.class);
-        assertThatThrownBy(() -> new CheckoutFactory(new PricingRules(List.of()), null))
-                .isInstanceOf(NullPointerException.class);
+    void bindsAnExternalCatalogueWithExplicitlyEmptyPromotionLists() {
+        contextRunner
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                    checkout.scan("X");
+                    assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
+                });
     }
 
     @Test
-    void bindsAnExternalCatalogueWithExplicitlyEmptyPromotionLists() {
-        new ApplicationContextRunner().withUserConfiguration(CheckoutConfiguration.class)
-                .withPropertyValues("checkout.unit-prices.X=42", "checkout.multi-prices=",
-                        "checkout.buy-n-get-one-free=", "checkout.meal-deals=")
+    void injectsAnAlternativePricingEngineIntoTheFactory() {
+        List<Integer> pricedQuantities = new ArrayList<>();
+        IPricingEngine alternative = (basket, promotions) -> {
+            pricedQuantities.add(basket.quantityOf("X"));
+            return pricingEngine.calculate(basket, promotions);
+        };
+        contextRunner.withBean("alternativeEngine", IPricingEngine.class, () -> alternative,
+                        definition -> definition.setPrimary(true))
                 .run(context -> {
                     assertThat(context).hasNotFailed();
-                    Checkout checkout = context.getBean(CheckoutFactory.class).create();
+                    ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
                     checkout.scan("X");
                     assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
+                    assertThat(pricedQuantities).containsExactly(1);
+                });
+    }
+
+    @Test
+    void injectsAnAlternativeOptimizerIntoThePricingEngine() {
+        List<Integer> optimizedQuantities = new ArrayList<>();
+        IPromotionOptimizer alternative = (basket, rules) -> {
+            optimizedQuantities.add(basket.quantityOf("X"));
+            assertThat(rules).isEmpty();
+            return Money.ZERO;
+        };
+        contextRunner.withBean("alternativeOptimizer", IPromotionOptimizer.class, () -> alternative,
+                        definition -> definition.setPrimary(true))
+                .run(context -> {
+                    assertThat(context).hasNotFailed();
+                    ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                    checkout.scan("X");
+                    assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
+                    assertThat(optimizedQuantities).containsExactly(1);
                 });
     }
 

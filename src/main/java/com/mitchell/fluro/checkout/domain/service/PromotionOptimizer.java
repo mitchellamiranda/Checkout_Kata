@@ -15,9 +15,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-final class PromotionOptimizer {
+public final class PromotionOptimizer implements IPromotionOptimizer {
 
-    Money maximumSavings(Basket basket, List<PricingRule> rules) {
+    @Override
+    public Money maximumSavings(Basket basket, List<PricingRule> rules) {
         Map<PricingRule, Money> discounts = new LinkedHashMap<>();
         for (PricingRule rule : rules) {
             Money regularPrice = rule.unitTotal(basket);

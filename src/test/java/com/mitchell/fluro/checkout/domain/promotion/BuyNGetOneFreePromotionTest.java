@@ -4,7 +4,9 @@ import com.mitchell.fluro.checkout.domain.model.Basket;
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRule;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
 import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
 
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @DisplayName("Buy three C, get a fourth C free")
 class BuyNGetOneFreePromotionTest {
 
+    private final IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
     private static final Item C = new Item("C", Money.ofPence(25));
     private final IPromotion promotion = new BuyNGetOneFreePromotion("C", 3);
 
@@ -29,7 +32,7 @@ class BuyNGetOneFreePromotionTest {
             "6, 125", "7, 150", "8, 150", "9, 175", "11, 225", "12, 225", "13, 250"})
     void pricesCompleteGroupsOfFourAndRemainders(int quantity, long expected) {
         Basket basket = new Basket(quantity == 0 ? Map.of() : Map.of(C, quantity));
-        assertThat(new PricingEngine().calculate(basket, List.of(promotion))).isEqualTo(Money.ofPence(expected));
+        assertThat(engine.calculate(basket, List.of(promotion))).isEqualTo(Money.ofPence(expected));
     }
 
     @Test
@@ -42,16 +45,16 @@ class BuyNGetOneFreePromotionTest {
     @Test
     void derivesTheBundlePriceFromTheTransactionNotHardcodedPrices() {
         Item changedC = new Item("C", Money.ofPence(40));
-        assertThat(new PricingEngine().calculate(new Basket(Map.of(changedC, 4)), List.of(promotion)))
+        assertThat(engine.calculate(new Basket(Map.of(changedC, 4)), List.of(promotion)))
                 .isEqualTo(Money.ofPence(120));
     }
 
     @Test
     void supportsBuyOneGetOneFreeAndAlreadyFreeItems() {
         IPromotion buyOne = new BuyNGetOneFreePromotion("C", 1);
-        assertThat(new PricingEngine().calculate(new Basket(Map.of(C, 5)), List.of(buyOne)))
+        assertThat(engine.calculate(new Basket(Map.of(C, 5)), List.of(buyOne)))
                 .isEqualTo(Money.ofPence(75));
-        assertThat(new PricingEngine().calculate(new Basket(Map.of(new Item("C", Money.ZERO), 4)),
+        assertThat(engine.calculate(new Basket(Map.of(new Item("C", Money.ZERO), 4)),
                 List.of(promotion))).isEqualTo(Money.ZERO);
     }
 

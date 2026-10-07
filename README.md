@@ -68,12 +68,17 @@ The application API works without starting Spring:
 
 ```java
 import com.mitchell.fluro.checkout.application.checkout.Checkout;
+import com.mitchell.fluro.checkout.application.checkout.ICheckout;
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
 import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
+import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
+import com.mitchell.fluro.checkout.domain.service.IPromotionOptimizer;
+import com.mitchell.fluro.checkout.domain.service.PricingEngine;
+import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
 
 import java.util.List;
 import java.util.Map;
@@ -90,7 +95,9 @@ var pricingRules = new PricingRules(
                 new BuyNGetOneFreePromotion("C", 3),
                 new MealDealPromotion(Map.of("D", 1, "E", 1), Money.ofPence(300))));
 
-var checkout = new Checkout(pricingRules);
+IPromotionOptimizer optimizer = new PromotionOptimizer();
+IPricingEngine pricingEngine = new PricingEngine(optimizer);
+ICheckout checkout = new Checkout(pricingRules, pricingEngine);
 checkout.scan("B");
 checkout.scan("A");
 checkout.scan("B");
@@ -99,10 +106,13 @@ Money total = checkout.getTotal(); // Money[pence=175]
 long pence = total.pence();        // 175
 ```
 
-In a Spring application, inject `CheckoutFactory` and call `create()` for each
+In a Spring application, inject `ICheckoutFactory` and call `create()` for each
 transaction. The factory shares immutable rules and a stateless pricing engine,
 **not** a mutable checkout. Calling `getTotal()` does not consume promotions or
-change the basket; scanning may continue afterwards.
+change the basket; scanning may continue afterwards. `Checkout` requires an
+`IPricingEngine`, and `PricingEngine` requires an `IPromotionOptimizer`; neither
+constructs its own service dependencies. The former single-argument checkout
+constructor and no-argument pricing-engine constructor have been removed.
 
 ### Changing prices
 
