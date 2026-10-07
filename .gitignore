@@ -1,0 +1,5 @@
+/target/
+/.idea/
+*.iml
+# Supplied exercise brief; retained locally.
+/Fluro - Take Home Exercise 2026.pdf
