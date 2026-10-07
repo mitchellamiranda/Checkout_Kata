@@ -95,6 +95,18 @@ class PricingEngineTest {
                 .isInstanceOf(IllegalStateException.class).hasMessage("Invalid promotion configuration");
     }
 
+    @Test
+    void mergesPreviouslySeparateGroupsWhenAnOfferBridgesThem() {
+        Item c = new Item("C", Money.ofPence(100));
+        Item d = new Item("D", Money.ofPence(100));
+        Basket basket = new Basket(Map.of(A, 1, B, 1, c, 1, d, 1));
+        Promotion ab = offer(Map.of("A", 1, "B", 1), 150);
+        Promotion cd = offer(Map.of("C", 1, "D", 1), 150);
+        Promotion bc = offer(Map.of("B", 1, "C", 1), 1);
+        assertThat(engine.calculate(basket, List.of(ab, cd, bc))).isEqualTo(Money.ofPence(201));
+        assertThat(engine.calculate(basket, List.of(bc, cd, ab))).isEqualTo(Money.ofPence(201));
+    }
+
     private static Promotion offer(Map<String, Integer> quantities, long price) {
         PricingRule rule = new PricingRule(quantities, Money.ofPence(price));
         return basket -> PromotionResult.eligible(rule, basket);
