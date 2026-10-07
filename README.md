@@ -141,13 +141,48 @@ All packages are beneath `com.mitchell.fluro.checkout`.
 | `domain.model` | Immutable `Money`, `Item` and `Basket` value objects and invariants |
 | `domain.pricing` | Catalogue snapshot (`PricingRules`) and atomic bundle exchange (`PricingRule`) |
 | `domain.promotion` | `IPromotion` strategies and immutable candidate results |
-| `domain.service` | Unit valuation, offer coordination and exact allocation |
-| `application.checkout` | Stateful transaction orchestration and transaction factory |
+| `domain.service` | `IPricingEngine` and `IPromotionOptimizer` contracts, valuation and exact allocation |
+| `application.checkout` | `ICheckout` transaction API and `ICheckoutFactory` transaction creation |
 | `infrastructure` | Spring binding, configuration validation and dependency composition |
 
 Tests mirror these packages under `src/test/java`. Domain and application
 classes have no Spring dependencies or annotations. There are no repository
 interfaces or adapters for infrastructure that the exercise does not need.
+
+### Dependency injection and SOLID
+
+All project-owned interfaces use the `I` prefix. Contracts are introduced for
+behavioural boundaries, not mechanically added to immutable data types such as
+`Money`, `Basket` or `PricingRules`.
+
+```text
+ICheckoutFactory -> CheckoutFactory
+    creates ICheckout -> Checkout
+        receives IPricingEngine -> PricingEngine
+            receives IPromotionOptimizer -> PromotionOptimizer
+
+PricingRules contains IPromotion strategies.
+```
+
+`CheckoutConfiguration` is the Spring composition root. It registers interface-
+typed service beans and supplies dependencies through constructors. Callers
+inject `ICheckoutFactory`, rather than looking up services or constructing a
+pricing engine inside business code. Alternative engines or optimizers can be
+selected using normal Spring bean configuration, such as `@Primary`, without
+changing their consumers.
+
+The factory's `new Checkout(...)` is intentional: creating a fresh transaction
+is its single responsibility. The injected services remain shared; mutable
+transaction state does not. Constructing immutable values is also distinct from
+constructing service dependencies.
+
+| Principle | Application |
+| --- | --- |
+| Single Responsibility | Checkout scans, the factory creates transactions, the engine coordinates pricing, strategies describe offers, and the optimizer allocates them |
+| Open/Closed | New `IPromotion` beans join the configured offers without changing existing strategies, consumers or the composition root |
+| Liskov Substitution | Interfaces document pricing, non-mutation and transaction-isolation contracts; implementations and recording decorators are exercised through those contracts |
+| Interface Segregation | Separate small APIs for scanning, transaction creation, pricing, allocation and offer generation |
+| Dependency Inversion | Checkout and pricing orchestration depend on injected abstractions; concrete service selection stays at the infrastructure boundary |
 
 ### Domain design
 
@@ -232,10 +267,24 @@ The supplied price list consists entirely of independent one-offer components.
 
 ## Extending the solution
 
-Add a new immutable `IPromotion` implementation and register an instance in
-the `PricingRules` promotion list. Existing promotion classes and the allocation
-engine remain unchanged: this is the Open/Closed boundary. The composition
-root is deliberately allowed to change when registering a new strategy.
+Add a new immutable `IPromotion` implementation. For plain Java, register an
+instance in the `PricingRules` promotion list. For Spring, expose an
+`IPromotion` bean in a scanned configuration class: `CheckoutConfiguration`
+collects all such beans alongside the YAML-defined offers. An empty bean list
+is valid and preserves the supplied exercise configuration.
+
+For example, an additional Spring configuration can register a bundle:
+
+```java
+@Bean
+IPromotion additionalBundle() {
+    return new MultiPricePromotion("A", 3, Money.ofPence(120));
+}
+```
+
+Return a new custom `IPromotion` implementation in the same way. Existing
+strategies, the pricing engine and `CheckoutConfiguration` need no changes.
+Parameters may instead come from the new configuration's own typed properties.
 
 For example, a buy-two-get-two-free strategy can emit a bundle consuming four
 of its configured SKU for twice that item's transaction unit price. A strategy
@@ -246,8 +295,8 @@ greedily select one. Returning `PromotionResult.NONE` means no eligible offer.
 Strategies must be deterministic, side-effect-free, and return repeatable
 fixed-price exchanges involving items in the basket. Failures propagate rather
 than silently falling back to unit pricing. A new strategy that needs external
-configuration also needs a typed configuration entry and registration in
-`CheckoutConfiguration`; no existing strategy logic changes.
+configuration can bind its own typed properties and expose its own bean; it
+does not need to extend the existing configuration schema.
 
 One-time coupons, order-sensitive rewards and discounts that stack on already
 discounted items are deliberately **outside** this exchange model. Supporting
@@ -269,8 +318,10 @@ It does not reuse production eligibility or optimization helpers.
 Large-basket cases include five million items with independent promotions,
 20,000 items with overlapping offers, and quantities at `Integer.MAX_VALUE`.
 Spring tests exercise real YAML binding, the supplied rules, startup and
-factory wiring; most tests remain plain, fast unit tests. Mockito is excluded
-because no mocks are needed.
+factory wiring, including alternative injected engines/optimizers and multiple
+additional promotion beans. Recording test doubles verify delegation, current
+basket snapshots, candidate deduplication and failure propagation; most tests
+remain plain, fast unit tests. Mockito is excluded because no mocks are needed.
 
 ## Future improvements
 
