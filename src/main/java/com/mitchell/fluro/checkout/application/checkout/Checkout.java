@@ -31,7 +31,7 @@ public final class Checkout {
     }
 
     public Money getTotal() {
-        return pricingEngine.calculate(basket);
+        return pricingEngine.calculate(basket, pricingRules.promotions());
     }
 
     public Basket getBasket() {
