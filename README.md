@@ -278,9 +278,10 @@ included.
 ## Development and submission
 
 Git history records incremental domain, checkout, strategy, optimization,
-configuration, test and documentation changes. The repository is local; no
-remote has been created or pushed. The supplied PDF and IDE metadata remain
-local and are excluded from version control.
+configuration, test and documentation changes. The private personal repository
+is hosted at https://github.com/pt3cmimi/Checkout_Kata. Reviewers need explicit
+repository access. The supplied PDF and IDE metadata remain local and are
+excluded from version control.
 
 AI assistance was used for implementation, test generation and documentation.
 The key interview discussion points are the repeatable-bundle contract, exact
