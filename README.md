@@ -114,18 +114,57 @@ change the basket; scanning may continue afterwards. `Checkout` requires an
 constructs its own service dependencies. The former single-argument checkout
 constructor and no-argument pricing-engine constructor have been removed.
 
-### Changing prices
+### XML configuration and changing prices
 
-The supplied price list is data in `src/main/resources/application.yml`, not
-constants inside checkout or promotion algorithms. Spring's external
-configuration can override it without recompiling the engine, for example by
-supplying an external `application.yml` when starting the packaged application.
+Spring XML defines both the dependency graph and the exercise price list.
+There is no YAML configuration and no Java `@Bean` factory logic.
 
-The configuration has a `checkout.unit-prices` map and three typed promotion
-lists: `multi-prices`, `buy-n-get-one-free`, and `meal-deals`. Amounts are pence;
-quantities are positive integers. Use an explicit empty list (`[]`) to disable
-a promotion family. All four configuration sections are required; missing deal
-prices are rejected rather than interpreted as zero.
+| Resource in `src/main/resources` | Responsibility |
+| --- | --- |
+| `ApplicationContext.xml` | Root context importing pricing and service definitions |
+| `PricingRulesContext.xml` | Items, money values, catalogue and promotion beans |
+| `CheckoutServicesContext.xml` | Optimizer, pricing engine and checkout factory, connected by constructor references |
+
+`CheckoutConfiguration` only imports the XML root. The service definitions use
+normal Spring bean syntax, for example:
+
+```xml
+<bean id="pricingEngine" class="com.mitchell.fluro.checkout.domain.service.PricingEngine">
+    <constructor-arg name="optimizer" ref="promotionOptimizer"/>
+</bean>
+```
+
+Constructor injection deliberately replaces setter-style `<property>` injection:
+dependencies remain required and final, and objects cannot exist half-configured.
+The factory is a singleton that creates a fresh checkout for each transaction;
+mutable checkouts are not singleton beans. The XML uses only Spring's beans
+namespace: no Hazelcast, database or transaction infrastructure is needed.
+
+Change `Money` constructor values and promotion constructor arguments in the
+pricing XML to change prices and quantities. Amounts are pence; quantities must
+be positive. Remove a promotion bean to disable it. Constructor validation
+rejects missing prices and invalid values at startup rather than silently
+turning them into free offers.
+
+The `pricingRules` bean uses constructor autowiring to collect all `Item` and
+`IPromotion` beans; without promotions it uses the unit-only constructor. The
+separate `catalogue` is an explicit item list used by the supplied offer
+expressions, such as `#{catalogue.item(itemB.sku()).sku()}`. This keeps SKU
+identity in item beans and checks that an offer's item exists in the catalogue.
+When extending the supplied price list, add new items to that catalogue too.
+
+An external root context can replace the bundled one without recompiling:
+
+```powershell
+java -jar target\checkout-1.0.0-SNAPSHOT.jar --checkout.context=file:./config/ApplicationContext.xml
+```
+
+The `file:` value is a Spring resource URI, not a shell path. The external root
+must import or define its pricing rules and services. Relative XML imports
+resolve next to that root; `classpath:CheckoutServicesContext.xml` can reuse the
+bundled services with external pricing. A missing or invalid root fails startup;
+it does not fall back to the bundled prices. Treat XML as trusted application
+configuration because it can instantiate classes and evaluate expressions.
 
 For the plain Java API, construct another `PricingRules` instance and pass it
 to a new `Checkout`. The one-argument `PricingRules(items)` constructor enables
@@ -143,7 +182,7 @@ All packages are beneath `com.mitchell.fluro.checkout`.
 | `domain.promotion` | `IPromotion` strategies and immutable candidate results |
 | `domain.service` | `IPricingEngine` and `IPromotionOptimizer` contracts, valuation and exact allocation |
 | `application.checkout` | `ICheckout` transaction API and `ICheckoutFactory` transaction creation |
-| `infrastructure` | Spring binding, configuration validation and dependency composition |
+| `infrastructure` | Spring XML bootstrap; bean composition lives in XML resources |
 
 Tests mirror these packages under `src/test/java`. Domain and application
 classes have no Spring dependencies or annotations. There are no repository
@@ -164,12 +203,14 @@ ICheckoutFactory -> CheckoutFactory
 PricingRules contains IPromotion strategies.
 ```
 
-`CheckoutConfiguration` is the Spring composition root. It registers interface-
-typed service beans and supplies dependencies through constructors. Callers
+`ApplicationContext.xml` and its imports form the Spring composition root.
+`CheckoutConfiguration` is only the bootstrap bridge. XML supplies service
+dependencies through constructor references. Callers
 inject `ICheckoutFactory`, rather than looking up services or constructing a
-pricing engine inside business code. Alternative engines or optimizers can be
-selected using normal Spring bean configuration, such as `@Primary`, without
-changing their consumers.
+pricing engine inside business code. Alternative engines or optimizers are
+selected by changing bean classes or constructor `ref` values in a replacement
+service XML context, without changing their consumers. Explicit references are
+intentional: marking an unrelated bean primary does not override them.
 
 The factory's `new Checkout(...)` is intentional: creating a fresh transaction
 is its single responsibility. The injected services remain shared; mutable
@@ -179,7 +220,7 @@ constructing service dependencies.
 | Principle | Application |
 | --- | --- |
 | Single Responsibility | Checkout scans, the factory creates transactions, the engine coordinates pricing, strategies describe offers, and the optimizer allocates them |
-| Open/Closed | New `IPromotion` beans join the configured offers without changing existing strategies, consumers or the composition root |
+| Open/Closed | New XML `IPromotion` beans join the collected offers without changing existing strategies, consumers or Java configuration |
 | Liskov Substitution | Interfaces document pricing, non-mutation and transaction-isolation contracts; implementations and recording decorators are exercised through those contracts |
 | Interface Segregation | Separate small APIs for scanning, transaction creation, pricing, allocation and offer generation |
 | Dependency Inversion | Checkout and pricing orchestration depend on injected abstractions; concrete service selection stays at the infrastructure boundary |
@@ -268,23 +309,27 @@ The supplied price list consists entirely of independent one-offer components.
 ## Extending the solution
 
 Add a new immutable `IPromotion` implementation. For plain Java, register an
-instance in the `PricingRules` promotion list. For Spring, expose an
-`IPromotion` bean in a scanned configuration class: `CheckoutConfiguration`
-collects all such beans alongside the YAML-defined offers. An empty bean list
-is valid and preserves the supplied exercise configuration.
+instance in the `PricingRules` promotion list. For Spring, declare its bean in
+the pricing XML or an imported XML context. Constructor autowiring includes it
+alongside the existing offers.
 
-For example, an additional Spring configuration can register a bundle:
+For example, add this definition to the pricing context to register a bundle:
 
-```java
-@Bean
-IPromotion additionalBundle() {
-    return new MultiPricePromotion("A", 3, Money.ofPence(120));
-}
+```xml
+<bean id="additionalBundle" class="com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion">
+    <constructor-arg name="sku" value="#{catalogue.item(itemA.sku()).sku()}"/>
+    <constructor-arg name="quantity" value="3"/>
+    <constructor-arg name="bundlePrice">
+        <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+            <constructor-arg value="120"/>
+        </bean>
+    </constructor-arg>
+</bean>
 ```
 
-Return a new custom `IPromotion` implementation in the same way. Existing
+Register a new custom `IPromotion` implementation in the same way. Existing
 strategies, the pricing engine and `CheckoutConfiguration` need no changes.
-Parameters may instead come from the new configuration's own typed properties.
+Its constructor parameters and dependencies belong in the XML definition.
 
 For example, a buy-two-get-two-free strategy can emit a bundle consuming four
 of its configured SKU for twice that item's transaction unit price. A strategy
@@ -295,8 +340,8 @@ greedily select one. Returning `PromotionResult.NONE` means no eligible offer.
 Strategies must be deterministic, side-effect-free, and return repeatable
 fixed-price exchanges involving items in the basket. Failures propagate rather
 than silently falling back to unit pricing. A new strategy that needs external
-configuration can bind its own typed properties and expose its own bean; it
-does not need to extend the existing configuration schema.
+configuration can receive values and bean references through its XML definition;
+it does not need to extend a Java configuration schema.
 
 One-time coupons, order-sensitive rewards and discounts that stack on already
 discounted items are deliberately **outside** this exchange model. Supporting
@@ -336,9 +381,9 @@ It does not reuse production eligibility or optimization helpers.
 
 Large-basket cases include five million items with independent promotions,
 20,000 items with overlapping offers, and quantities at `Integer.MAX_VALUE`.
-Spring tests exercise real YAML binding, the supplied rules, startup and
-factory wiring, including alternative injected engines/optimizers and multiple
-additional promotion beans. Recording test doubles verify delegation, current
+Spring tests exercise actual XML imports, the supplied rules, startup and
+factory wiring, including alternative injected engines/optimizers, invalid
+configuration and additional promotion beans. Recording test doubles verify delegation, current
 basket snapshots, candidate deduplication and failure propagation; most tests
 remain plain, fast unit tests. Mockito is excluded because no mocks are needed.
 
