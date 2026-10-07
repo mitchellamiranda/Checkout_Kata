@@ -7,6 +7,7 @@ import com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion;
 import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
 import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
+import com.mitchell.fluro.checkout.support.TestCaseBuilder;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -14,7 +15,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
-import java.util.stream.IntStream;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -23,9 +23,34 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class PricingOptimalityTest {
 
-    @ParameterizedTest(name = "exhaustive oracle, deterministic seed {0}")
-    @MethodSource("seeds")
-    void agreesWithIndependentEnumerationOfEveryOfferCount(int seed) {
+    @ParameterizedTest
+    @MethodSource("calculateDataProvider")
+    @SuppressWarnings("unchecked")
+    void calculateTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
+                       Money expected) {
+        IPricingEngine engine = (IPricingEngine) dataValues.get("engine");
+        Basket basket = (Basket) dataValues.get("basket");
+        List<IPromotion> promotions = (List<IPromotion>) dataValues.get("promotions");
+        List<IPromotion> reversedPromotions = (List<IPromotion>) dataValues.get("reversedPromotions");
+        assertThat(engine.calculate(basket, promotions)).isEqualTo(expected);
+        assertThat(engine.calculate(basket, reversedPromotions)).isEqualTo(expected);
+    }
+
+    static Object[][] calculateDataProvider() {
+        HashMap<String, Object> dataDefaults = new HashMap<>();
+        HashMap<String, Integer> expectedCallsDefaults = new HashMap<>();
+        HashMap<String, Object> dataValues = new HashMap<>(dataDefaults);
+        HashMap<String, Integer> expectedCalls = new HashMap<>(expectedCallsDefaults);
+        TestCaseBuilder tcb = new TestCaseBuilder(dataValues, expectedCalls, dataDefaults, expectedCallsDefaults);
+        Object[][] cases = new Object[250][];
+        for (int seed = 0; seed < cases.length; seed++) {
+            Money expected = prepareScenario(dataValues, seed);
+            cases[seed] = tcb.addCase(expected);
+        }
+        return cases;
+    }
+
+    private static Money prepareScenario(HashMap<String, Object> dataValues, int seed) {
         Random random = new Random(seed);
         String[] skus = {"A", "B", "C"};
         long[] prices = {1 + random.nextInt(200), 1 + random.nextInt(200), 1 + random.nextInt(200)};
@@ -56,15 +81,14 @@ class PricingOptimalityTest {
                 new ExpectedOffer(new int[]{1, 1, 0}, abPrice),
                 new ExpectedOffer(new int[]{0, 1, 1}, bcPrice));
         Money expected = Money.ofPence(enumerate(counts, prices, offers, 0));
-        Basket basket = new Basket(items);
-        IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
-        assertThat(engine.calculate(basket, promotions)).isEqualTo(expected);
-        Collections.reverse(promotions);
-        assertThat(engine.calculate(basket, promotions)).isEqualTo(expected);
-    }
-
-    static IntStream seeds() {
-        return IntStream.range(0, 250);
+        List<IPromotion> reversedPromotions = new ArrayList<>(promotions);
+        Collections.reverse(reversedPromotions);
+        dataValues.put("seed", seed);
+        dataValues.put("basket", new Basket(items));
+        dataValues.put("engine", new PricingEngine(new PromotionOptimizer()));
+        dataValues.put("promotions", promotions);
+        dataValues.put("reversedPromotions", reversedPromotions);
+        return expected;
     }
 
     // Deliberately independent of production eligibility, savings, grouping and state-search helpers.
