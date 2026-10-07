@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <bean id="itemX" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="X"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="42"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="catalogue" class="com.mitchell.fluro.checkout.domain.pricing.PricingRules">
+        <constructor-arg name="items"><list><ref bean="itemX"/></list></constructor-arg>
+    </bean>
+    <bean id="pricingRules" class="com.mitchell.fluro.checkout.domain.pricing.PricingRules"
+          autowire="constructor"/>
+</beans>

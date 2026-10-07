@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <import resource="classpath:ApplicationContext.xml"/>
+    <bean id="invalidOffer" class="com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion">
+        <constructor-arg name="quantities">
+            <map key-type="java.lang.String" value-type="java.lang.Integer">
+                <entry key="#{catalogue.item(itemD.sku()).sku()}" value="1"/>
+                <entry key="#{catalogue.item(itemE.sku()).sku()}" value="1"/>
+            </map>
+        </constructor-arg>
+        <!-- dealPrice is deliberately omitted; it must not become a free meal. -->
+    </bean>
+</beans>

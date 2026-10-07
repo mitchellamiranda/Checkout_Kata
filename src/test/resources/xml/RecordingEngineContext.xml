@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <import resource="UnitCatalogue.xml"/>
+    <import resource="PairPromotion.xml"/>
+    <bean id="pricingEngine" class="com.mitchell.fluro.checkout.infrastructure.CheckoutConfigurationTest$RecordingEngine">
+        <constructor-arg name="baskets"><bean class="java.util.ArrayList"/></constructor-arg>
+        <constructor-arg name="promotions"><bean class="java.util.ArrayList"/></constructor-arg>
+        <constructor-arg name="result">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money"><constructor-arg value="17"/></bean>
+        </constructor-arg>
+    </bean>
+    <bean id="checkoutFactory" class="com.mitchell.fluro.checkout.application.checkout.CheckoutFactory">
+        <constructor-arg name="pricingRules" ref="pricingRules"/>
+        <constructor-arg name="pricingEngine" ref="pricingEngine"/>
+    </bean>
+</beans>

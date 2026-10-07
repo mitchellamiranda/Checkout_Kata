@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           https://www.springframework.org/schema/beans/spring-beans.xsd">
+
+    <!-- Prices are integer pence; item beans are the single source of SKU identity. -->
+    <bean id="itemA" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="A"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="50"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="itemB" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="B"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="75"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="itemC" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="C"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="25"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="itemD" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="D"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="150"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="itemE" class="com.mitchell.fluro.checkout.domain.model.Item">
+        <constructor-arg name="sku" value="E"/>
+        <constructor-arg name="unitPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="200"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+
+    <bean id="catalogue" class="com.mitchell.fluro.checkout.domain.pricing.PricingRules">
+        <constructor-arg name="items">
+            <list>
+                <ref bean="itemA"/>
+                <ref bean="itemB"/>
+                <ref bean="itemC"/>
+                <ref bean="itemD"/>
+                <ref bean="itemE"/>
+            </list>
+        </constructor-arg>
+    </bean>
+
+    <bean id="multiPricePromotion"
+          class="com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion">
+        <constructor-arg name="sku" value="#{catalogue.item(itemB.sku()).sku()}"/>
+        <constructor-arg name="quantity" value="2"/>
+        <constructor-arg name="bundlePrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="125"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+    <bean id="buyNGetOneFreePromotion"
+          class="com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion">
+        <constructor-arg name="sku" value="#{catalogue.item(itemC.sku()).sku()}"/>
+        <constructor-arg name="paidQuantity" value="3"/>
+    </bean>
+    <bean id="mealDealPromotion"
+          class="com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion">
+        <constructor-arg name="quantities">
+            <map key-type="java.lang.String" value-type="java.lang.Integer">
+                <entry key="#{catalogue.item(itemD.sku()).sku()}" value="1"/>
+                <entry key="#{catalogue.item(itemE.sku()).sku()}" value="1"/>
+            </map>
+        </constructor-arg>
+        <constructor-arg name="dealPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money">
+                <constructor-arg value="300"/>
+            </bean>
+        </constructor-arg>
+    </bean>
+
+    <!-- Constructor autowiring collects every Item and IPromotion bean, including extensions. -->
+    <bean id="pricingRules" class="com.mitchell.fluro.checkout.domain.pricing.PricingRules"
+          autowire="constructor"/>
+</beans>

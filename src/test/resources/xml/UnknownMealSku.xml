@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <import resource="UnitOnlyContext.xml"/>
+    <bean id="invalidOffer" class="com.mitchell.fluro.checkout.domain.promotion.MealDealPromotion">
+        <constructor-arg name="quantities">
+            <map key-type="java.lang.String" value-type="java.lang.Integer">
+                <entry key="#{catalogue.item(itemX.sku()).sku()}" value="1"/>
+                <entry key="#{catalogue.item('Z').sku()}" value="1"/>
+            </map>
+        </constructor-arg>
+        <constructor-arg name="dealPrice">
+            <bean class="com.mitchell.fluro.checkout.domain.model.Money"><constructor-arg value="50"/></bean>
+        </constructor-arg>
+    </bean>
+</beans>

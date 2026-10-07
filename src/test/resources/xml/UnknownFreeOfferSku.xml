@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans https://www.springframework.org/schema/beans/spring-beans.xsd">
+    <import resource="UnitOnlyContext.xml"/>
+    <bean id="invalidOffer" class="com.mitchell.fluro.checkout.domain.promotion.BuyNGetOneFreePromotion">
+        <constructor-arg name="sku" value="#{catalogue.item('Z').sku()}"/>
+        <constructor-arg name="paidQuantity" value="3"/>
+    </bean>
+</beans>
