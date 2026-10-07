@@ -6,4 +6,5 @@
 
     <import resource="PricingRulesContext.xml"/>
     <import resource="CheckoutServicesContext.xml"/>
+    <import resource="DemoContext.xml"/>
 </beans>

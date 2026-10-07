@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/beans
+                           https://www.springframework.org/schema/beans/spring-beans.xsd"
+       profile="demo">
+
+    <bean id="checkoutDemo" class="com.mitchell.fluro.checkout.infrastructure.CheckoutDemo">
+        <constructor-arg name="checkoutFactory" ref="checkoutFactory"/>
+        <constructor-arg name="output" value="#{T(java.lang.System).out}"/>
+    </bean>
+</beans>
