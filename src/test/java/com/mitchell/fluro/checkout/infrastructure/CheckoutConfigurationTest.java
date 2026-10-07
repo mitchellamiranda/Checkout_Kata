@@ -25,9 +25,9 @@ class CheckoutConfigurationTest {
     void constructsRulesFromAlternativeDataWithoutEngineChanges() {
         PricingProperties properties = new PricingProperties(
                 Map.of("X", 100L, "Y", 50L, "Z", 75L),
-                List.of(new PricingProperties.MultiPrice("X", 3, 250)),
+                List.of(new PricingProperties.MultiPrice("X", 3, 250L)),
                 List.of(new PricingProperties.BuyNGetOneFree("Y", 1)),
-                List.of(new PricingProperties.MealDeal(Map.of("X", 1, "Z", 1), 125)));
+                List.of(new PricingProperties.MealDeal(Map.of("X", 1, "Z", 1), 125L)));
         Checkout checkout = new Checkout(configuration.pricingRules(properties));
         for (String sku : List.of("X", "X", "X", "X", "Y", "Y", "Z")) {
             checkout.scan(sku);
@@ -46,7 +46,7 @@ class CheckoutConfigurationTest {
     @Test
     void rejectsUnknownPromotionSkusAtConfigurationTime() {
         PricingProperties properties = new PricingProperties(Map.of("A", 10L),
-                List.of(new PricingProperties.MultiPrice("Z", 2, 10)), List.of(), List.of());
+                List.of(new PricingProperties.MultiPrice("Z", 2, 10L)), List.of(), List.of());
         assertThatThrownBy(() -> configuration.pricingRules(properties))
                 .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown SKU: Z");
     }
@@ -56,10 +56,10 @@ class CheckoutConfigurationTest {
         Map<String, Long> prices = new HashMap<>(Map.of("A", 10L));
         List<PricingProperties.MultiPrice> offers = new ArrayList<>();
         Map<String, Integer> quantities = new HashMap<>(Map.of("A", 1, "B", 1));
-        PricingProperties.MealDeal meal = new PricingProperties.MealDeal(quantities, 10);
+        PricingProperties.MealDeal meal = new PricingProperties.MealDeal(quantities, 10L);
         PricingProperties properties = new PricingProperties(prices, offers, List.of(), List.of(meal));
         prices.clear();
-        offers.add(new PricingProperties.MultiPrice("A", 2, 10));
+        offers.add(new PricingProperties.MultiPrice("A", 2, 10L));
         quantities.clear();
         assertThat(properties.unitPrices()).containsExactlyEntriesOf(Map.of("A", 10L));
         assertThat(properties.multiPrices()).isEmpty();
@@ -85,5 +85,13 @@ class CheckoutConfigurationTest {
                     checkout.scan("X");
                     assertThat(checkout.getTotal()).isEqualTo(Money.ofPence(42));
                 });
+    }
+
+    @Test
+    void missingPricesCannotSilentlyBecomeFreeOffers() {
+        assertThatThrownBy(() -> new PricingProperties.MultiPrice("A", 2, null))
+                .isInstanceOf(NullPointerException.class).hasMessage("Multiprice price is required");
+        assertThatThrownBy(() -> new PricingProperties.MealDeal(Map.of("A", 1, "B", 1), null))
+                .isInstanceOf(NullPointerException.class).hasMessage("Meal deal price is required");
     }
 }

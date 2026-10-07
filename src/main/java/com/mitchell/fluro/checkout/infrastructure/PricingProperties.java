@@ -2,6 +2,7 @@ package com.mitchell.fluro.checkout.infrastructure;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -19,15 +20,19 @@ public record PricingProperties(
         mealDeals = List.copyOf(mealDeals);
     }
 
-    public record MultiPrice(String sku, int quantity, long price) {
+    public record MultiPrice(String sku, int quantity, Long price) {
+        public MultiPrice {
+            Objects.requireNonNull(price, "Multiprice price is required");
+        }
     }
 
     public record BuyNGetOneFree(String sku, int paidQuantity) {
     }
 
-    public record MealDeal(Map<String, Integer> quantities, long price) {
+    public record MealDeal(Map<String, Integer> quantities, Long price) {
         public MealDeal {
             quantities = Map.copyOf(quantities);
+            Objects.requireNonNull(price, "Meal deal price is required");
         }
     }
 }
