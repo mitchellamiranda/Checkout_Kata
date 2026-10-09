@@ -3,6 +3,7 @@ package com.mitchell.fluro.checkout;
 import com.mitchell.fluro.checkout.application.checkout.ICheckout;
 import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Money;
+import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
 import com.mitchell.fluro.checkout.support.TestCaseBuilder;
 
 import java.util.HashMap;
@@ -12,6 +13,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
 
@@ -57,10 +59,11 @@ class CheckoutApplicationTest {
         @MethodSource("mainDataProvider")
         void mainTest(HashMap<String, Object> dataValues,
                       HashMap<String, Integer> expectedCalls, Money expected,
-                      @Autowired ICheckoutFactory factory) {
-            ICheckout checkout = scanItems(factory.create(), (String[]) dataValues.get("skus"));
+                      @Autowired ICheckoutFactory factory,
+                      @Autowired @Qualifier("pricingRules") PricingRules rules) {
+            ICheckout checkout = scanItems(factory.create(rules), (String[]) dataValues.get("skus"));
             assertThat(checkout.getTotal()).isEqualTo(expected);
-            assertThat(factory.create().getTotal()).isEqualTo(dataValues.get("emptyTotal"));
+            assertThat(factory.create(rules).getTotal()).isEqualTo(dataValues.get("emptyTotal"));
         }
 
         static Object[][] mainDataProvider() {

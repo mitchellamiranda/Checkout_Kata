@@ -5,8 +5,9 @@
                            https://www.springframework.org/schema/beans/spring-beans.xsd"
        profile="demo">
 
-    <bean id="checkoutDemo" class="com.mitchell.fluro.checkout.infrastructure.CheckoutDemo">
+    <bean id="checkoutDemo" class="com.mitchell.fluro.checkout.demo.CheckoutDemoRunner">
         <constructor-arg name="checkoutFactory" ref="checkoutFactory"/>
+        <constructor-arg name="pricingRules" ref="pricingRules"/>
         <constructor-arg name="output" value="#{T(java.lang.System).out}"/>
     </bean>
 </beans>

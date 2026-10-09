@@ -54,8 +54,8 @@ class CheckoutConfigurationTest {
                 });
                 assertThat(rules.promotions()).containsExactlyInAnyOrderElementsOf(
                         context.getBeansOfType(IPromotion.class).values()).hasSize(3);
-                ICheckout first = context.getBean(ICheckoutFactory.class).create();
-                ICheckout second = context.getBean(ICheckoutFactory.class).create();
+                ICheckout first = context.getBean(ICheckoutFactory.class).create(rules);
+                ICheckout second = context.getBean(ICheckoutFactory.class).create(rules);
                 ((List<String>) dataValues.get("scans")).forEach(first::scan);
 
                 assertThat(first).isNotSameAs(second);
@@ -112,7 +112,7 @@ class CheckoutConfigurationTest {
                 assertThat(rules.item("X").unitPrice()).isEqualTo(dataValues.get("unitPrice"));
                 assertThatThrownBy(() -> rules.item("A")).isExactlyInstanceOf(IllegalArgumentException.class)
                         .hasMessage("Unknown SKU: A");
-                ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                ICheckout checkout = context.getBean(ICheckoutFactory.class).create(rules);
                 ((List<String>) dataValues.get("scans")).forEach(checkout::scan);
                 assertThat(checkout.getTotal()).isEqualTo(expected);
             });
@@ -156,7 +156,7 @@ class CheckoutConfigurationTest {
                 assertThat(rules.promotions()).containsExactlyInAnyOrderElementsOf(
                         context.getBeansOfType(IPromotion.class).values())
                         .hasSize((Integer) dataValues.get("promotionCount"));
-                ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                ICheckout checkout = context.getBean(ICheckoutFactory.class).create(rules);
                 ((List<String>) dataValues.get("scans")).forEach(checkout::scan);
                 assertThat(checkout.getTotal()).isEqualTo(expected);
                 assertThatThrownBy(() -> rules.promotions().clear())
@@ -201,7 +201,8 @@ class CheckoutConfigurationTest {
             xmlRunner((String) dataValues.get("fixture")).run(context -> {
                 assertThat(context).hasNotFailed();
                 RecordingEngine engine = context.getBean("pricingEngine", RecordingEngine.class);
-                ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                ICheckout checkout = context.getBean(ICheckoutFactory.class)
+                        .create(context.getBean("pricingRules", PricingRules.class));
                 ((List<String>) dataValues.get("scans")).forEach(checkout::scan);
                 assertThat(checkout.getTotal()).isEqualTo(expected);
                 assertThat(engine.baskets()).containsExactly((Basket) dataValues.get("basket"))
@@ -244,7 +245,8 @@ class CheckoutConfigurationTest {
                 assertThat(context).hasNotFailed();
                 RecordingOptimizer optimizer = context.getBean("promotionOptimizer", RecordingOptimizer.class);
                 assertThat(context.getBean("pricingEngine")).isExactlyInstanceOf(PricingEngine.class);
-                ICheckout checkout = context.getBean(ICheckoutFactory.class).create();
+                ICheckout checkout = context.getBean(ICheckoutFactory.class)
+                        .create(context.getBean("pricingRules", PricingRules.class));
                 ((List<String>) dataValues.get("scans")).forEach(checkout::scan);
                 assertThat(checkout.getTotal()).isEqualTo(expected);
                 assertThat(optimizer.baskets()).containsExactly((Basket) dataValues.get("basket"))
@@ -272,6 +274,51 @@ class CheckoutConfigurationTest {
             dataValues.put("basket", new Basket(Map.of(new Item("X", Money.ofPence(42)), 2)));
             dataValues.put("rules", new ArrayList<>(List.of(new PricingRule(Map.of("X", 2), Money.ofPence(50)))));
             cases[0] = tcb.addCase(Money.ofPence(77));
+            return cases;
+        }
+    }
+
+    @Nested
+    class CallerSuppliedRules {
+
+        @ParameterizedTest
+        @MethodSource("createDataProvider")
+        void createTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
+                        Money expected) {
+            xmlRunner((String) dataValues.get("fixture")).run(context -> {
+                assertThat(context).hasNotFailed();
+                assertThat(context.getBeansOfType(PricingRules.class))
+                        .hasSize((Integer) dataValues.get("configuredRules"));
+                ICheckoutFactory factory = context.getBean(ICheckoutFactory.class);
+                ICheckout first = factory.create((PricingRules) dataValues.get("originalRules"));
+                first.scan("A");
+                assertThat(first.getTotal()).isEqualTo(dataValues.get("originalTotal"));
+
+                ICheckout second = factory.create((PricingRules) dataValues.get("revisedRules"));
+                second.scan("A");
+                assertThat(second.getTotal()).isEqualTo(expected);
+                assertThat(first.getTotal()).isEqualTo(dataValues.get("originalTotal"));
+            });
+        }
+
+        static Object[][] createDataProvider() {
+            HashMap<String, Object> dataDefaults = new HashMap<>();
+            dataDefaults.put("fixture", "ApplicationContext.xml");
+            dataDefaults.put("configuredRules", 2);
+            dataDefaults.put("originalRules", new PricingRules(List.of(new Item("A", Money.ofPence(10)))));
+            dataDefaults.put("revisedRules", new PricingRules(List.of(new Item("A", Money.ofPence(60)))));
+            dataDefaults.put("originalTotal", Money.ofPence(10));
+            HashMap<String, Integer> expectedCallsDefaults = new HashMap<>();
+            HashMap<String, Object> dataValues = new HashMap<>(dataDefaults);
+            HashMap<String, Integer> expectedCalls = new HashMap<>(expectedCallsDefaults);
+            TestCaseBuilder tcb = new TestCaseBuilder(
+                    dataValues, expectedCalls, dataDefaults, expectedCallsDefaults);
+            Object[][] cases = new Object[2][];
+
+            cases[0] = tcb.addCase(Money.ofPence(60));
+            dataValues.put("fixture", "CheckoutServicesContext.xml");
+            dataValues.put("configuredRules", 0);
+            cases[1] = tcb.addCase(Money.ofPence(60));
             return cases;
         }
     }
@@ -305,7 +352,7 @@ class CheckoutConfigurationTest {
 
             dataValues.put("fixture", "xml/MissingReference.xml");
             dataValues.put("rootType", NoSuchBeanDefinitionException.class);
-            cases[0] = tcb.addCase("No bean named 'pricingRules' available");
+            cases[0] = tcb.addCase("No bean named 'pricingEngine' available");
             dataValues.put("fixture", "xml/MissingUnitPrice.xml");
             dataValues.put("rootType", NoSuchBeanDefinitionException.class);
             cases[1] = tcb.addCase("No qualifying bean of type 'com.mitchell.fluro.checkout.domain.model.Money' "

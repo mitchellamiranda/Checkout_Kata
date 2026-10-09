@@ -15,7 +15,6 @@
         <constructor-arg name="optimizer" ref="promotionOptimizer"/>
     </bean>
     <bean id="checkoutFactory" class="com.mitchell.fluro.checkout.application.checkout.CheckoutFactory">
-        <constructor-arg name="pricingRules" ref="pricingRules"/>
         <constructor-arg name="pricingEngine" ref="pricingEngine"/>
     </bean>
 </beans>

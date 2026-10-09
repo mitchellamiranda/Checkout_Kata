@@ -5,6 +5,7 @@ import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
 import com.mitchell.fluro.checkout.domain.promotion.IPromotion;
+import com.mitchell.fluro.checkout.domain.promotion.MultiPricePromotion;
 import com.mitchell.fluro.checkout.domain.service.IPricingEngine;
 import com.mitchell.fluro.checkout.domain.service.PricingEngine;
 import com.mitchell.fluro.checkout.domain.service.PromotionOptimizer;
@@ -26,20 +27,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class CheckoutFactoryTest {
 
     @Nested
-    @DisplayName("Isolated transactions with constructor-injected pricing")
+    @DisplayName("Isolated transactions with caller-supplied pricing")
     class TransactionCreation {
 
         @ParameterizedTest
         @MethodSource("createDataProvider")
-        @DisplayName("Creates distinct baskets sharing the configured rules and engine")
+        @DisplayName("Creates distinct baskets sharing the supplied rules and injected engine")
         void createTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
                         TotalsExpected expected) {
             ICheckoutFactory factory = (ICheckoutFactory) dataValues.get("factory");
             PricingRules rules = (PricingRules) dataValues.get("rules");
             List<?> pricedPromotions = (List<?>) dataValues.get("pricedPromotions");
 
-            ICheckout first = factory.create();
-            ICheckout second = factory.create();
+            ICheckout first = factory.create(rules);
+            ICheckout second = factory.create(rules);
 
             assertThat(first).isNotSameAs(second);
             first.scan((String) dataValues.get("sku"));
@@ -70,9 +71,101 @@ class CheckoutFactoryTest {
 
             PricingRules rules = rules();
             dataValues.put("rules", rules);
-            dataValues.put("factory", new CheckoutFactory(rules, recordingEngine(dataValues)));
+            dataValues.put("factory", new CheckoutFactory(recordingEngine(dataValues)));
             cases[0] = builder.addCase(new TotalsExpected(Money.ofPence(50), Money.ZERO));
             return cases;
+        }
+    }
+
+    @Nested
+    @DisplayName("Each transaction retains its own prices, promotions and catalogue")
+    class ChangingRules {
+
+        @ParameterizedTest
+        @MethodSource("createDataProvider")
+        void createTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
+                        TotalsExpected expected) {
+            ICheckoutFactory factory = new CheckoutFactory(pricingEngine());
+            PricingRules originalRules = (PricingRules) dataValues.get("originalRules");
+            PricingRules revisedRules = (PricingRules) dataValues.get("revisedRules");
+            String revisedSku = (String) dataValues.get("revisedSku");
+            ICheckout first = factory.create(originalRules);
+            first.scan("A");
+            first.scan("A");
+            assertThat(first.getTotal()).isEqualTo(expected.firstTotal());
+
+            ICheckout second = factory.create(revisedRules);
+            assertThat(second.getBasket()).isEqualTo(Basket.empty());
+            second.scan(revisedSku);
+            second.scan(revisedSku);
+
+            assertThat(second.getTotal()).isEqualTo(expected.secondTotal());
+            assertThat(first.getTotal()).isEqualTo(expected.firstTotal());
+            first.scan("A");
+            first.scan("A");
+            assertThat(first.getTotal()).isEqualTo(expected.firstTotal().multiply(2));
+            assertThat(second.getTotal()).isEqualTo(expected.secondTotal());
+            if (!revisedSku.equals("A")) {
+                assertThatThrownBy(() -> first.scan(revisedSku))
+                        .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown SKU: " + revisedSku);
+                assertThatThrownBy(() -> second.scan("A"))
+                        .isInstanceOf(IllegalArgumentException.class).hasMessage("Unknown SKU: A");
+            }
+        }
+
+        static Object[][] createDataProvider() {
+            HashMap<String, Object> dataDefaults = new HashMap<>();
+            dataDefaults.put("originalRules", rules());
+            dataDefaults.put("revisedSku", "A");
+            HashMap<String, Integer> expectedCallsDefaults = new HashMap<>();
+            HashMap<String, Object> dataValues = new HashMap<>(dataDefaults);
+            HashMap<String, Integer> expectedCalls = new HashMap<>(expectedCallsDefaults);
+            TestCaseBuilder builder = new TestCaseBuilder(
+                    dataValues, expectedCalls, dataDefaults, expectedCallsDefaults);
+            Object[][] cases = new Object[4][];
+
+            dataValues.put("revisedRules", new PricingRules(List.of(new Item("A", Money.ofPence(60)))));
+            cases[0] = builder.addCase(new TotalsExpected(Money.ofPence(100), Money.ofPence(120)));
+            PricingRules promotionalRules = new PricingRules(List.of(new Item("A", Money.ofPence(50))),
+                    List.of(new MultiPricePromotion("A", 2, Money.ofPence(75))));
+            dataValues.put("revisedRules", promotionalRules);
+            cases[1] = builder.addCase(new TotalsExpected(Money.ofPence(100), Money.ofPence(75)));
+            dataValues.put("originalRules", promotionalRules);
+            dataValues.put("revisedRules", rules());
+            cases[2] = builder.addCase(new TotalsExpected(Money.ofPence(75), Money.ofPence(100)));
+            dataValues.put("revisedSku", "X");
+            dataValues.put("revisedRules", new PricingRules(List.of(new Item("X", Money.ofPence(42)))));
+            cases[3] = builder.addCase(new TotalsExpected(Money.ofPence(100), Money.ofPence(84)));
+            return cases;
+        }
+    }
+
+    @Nested
+    @DisplayName("Rules are required for every transaction")
+    class MissingRules {
+
+        @ParameterizedTest
+        @MethodSource("createDataProvider")
+        void createTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
+                        String expected) {
+            ICheckoutFactory factory = (ICheckoutFactory) dataValues.get("factory");
+            assertThatThrownBy(() -> factory.create((PricingRules) dataValues.get("rules")))
+                    .isInstanceOf(NullPointerException.class).hasMessage(expected);
+            assertThat(((AtomicInteger) dataValues.get("calculateCalls")).get())
+                    .isEqualTo(expectedCalls.get("calculate"));
+        }
+
+        static Object[][] createDataProvider() {
+            HashMap<String, Object> dataDefaults = new HashMap<>();
+            dataDefaults.put("rules", null);
+            HashMap<String, Integer> expectedCallsDefaults = new HashMap<>();
+            expectedCallsDefaults.put("calculate", 0);
+            HashMap<String, Object> dataValues = new HashMap<>(dataDefaults);
+            HashMap<String, Integer> expectedCalls = new HashMap<>(expectedCallsDefaults);
+            TestCaseBuilder builder = new TestCaseBuilder(
+                    dataValues, expectedCalls, dataDefaults, expectedCallsDefaults);
+            dataValues.put("factory", new CheckoutFactory(recordingEngine(dataValues)));
+            return new Object[][]{builder.addCase("Pricing rules are required")};
         }
     }
 
@@ -82,29 +175,25 @@ class CheckoutFactoryTest {
 
         @ParameterizedTest
         @MethodSource("constructorDataProvider")
-        @DisplayName("Rejects missing rules or pricing engine")
+        @DisplayName("Rejects a missing pricing engine")
         void constructorTest(HashMap<String, Object> dataValues, HashMap<String, Integer> expectedCalls,
                              Class<? extends Throwable> expected) {
             assertThatThrownBy(() -> new CheckoutFactory(
-                    (PricingRules) dataValues.get("rules"), (IPricingEngine) dataValues.get("pricingEngine")))
+                    (IPricingEngine) dataValues.get("pricingEngine")))
                     .isInstanceOf(expected);
         }
 
         static Object[][] constructorDataProvider() {
             HashMap<String, Object> dataDefaults = new HashMap<>();
-            dataDefaults.put("rules", null);
             dataDefaults.put("pricingEngine", null);
             HashMap<String, Integer> expectedCallsDefaults = new HashMap<>();
             HashMap<String, Object> dataValues = new HashMap<>(dataDefaults);
             HashMap<String, Integer> expectedCalls = new HashMap<>(expectedCallsDefaults);
             TestCaseBuilder builder = new TestCaseBuilder(
                     dataValues, expectedCalls, dataDefaults, expectedCallsDefaults);
-            Object[][] cases = new Object[2][];
+            Object[][] cases = new Object[1][];
 
-            dataValues.put("pricingEngine", pricingEngine());
             cases[0] = builder.addCase(NullPointerException.class);
-            dataValues.put("rules", rules());
-            cases[1] = builder.addCase(NullPointerException.class);
             return cases;
         }
     }

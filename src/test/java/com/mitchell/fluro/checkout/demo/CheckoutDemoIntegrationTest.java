@@ -1,4 +1,4 @@
-package com.mitchell.fluro.checkout.infrastructure;
+package com.mitchell.fluro.checkout.demo;
 
 import com.mitchell.fluro.checkout.CheckoutApplication;
 import com.mitchell.fluro.checkout.support.TestCaseBuilder;
@@ -41,8 +41,9 @@ class CheckoutDemoIntegrationTest {
                 assertThat(context.isActive()).isTrue();
                 assertThat(context.getBeansOfType(CommandLineRunner.class))
                         .hasSize(expectedCalls.get("runners"));
-                assertThat(context.getBeansOfType(CheckoutDemo.class).keySet())
+                assertThat(context.getBeansOfType(CheckoutDemoRunner.class).keySet())
                         .isEqualTo(dataValues.get("runnerNames"));
+                assertThat(context.getBeansOfType(CheckoutDemo.class)).isEmpty();
                 assertThat(context.containsBean("checkoutDemo")).isEqualTo(dataValues.get("demoPresent"));
                 assertThat(output.getOut()).isEqualTo(expected);
                 assertThat(output.getErr()).isEmpty();
