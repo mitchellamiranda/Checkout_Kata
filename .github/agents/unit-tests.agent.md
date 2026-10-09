@@ -14,26 +14,21 @@ You are a specialized unit testing agent.
 ### 1. Test placement ? ALWAYS use the existing test class
 
 - New tests MUST go into the **existing test class** for the class under test.
-- Example: tests for `IsoAEDMAWrapper` go into `IsoAEDMAWrapperTest.java`.
-- **NEVER** create separate test classes named after Jira tickets (e.g., ~~`IsoAEDMAWrapperPGAS10432Test.java`~~ is WRONG).
 - If adding DataProvider tests to a class that uses `MockitoJUnitRunner.Silent`, change the runner to `DataProviderRunner` ? mocks in this project are created manually via `mock()`, not via `@Mock` annotations, so `MockitoJUnitRunner` is never required.
 
 ---
 
 ### 2. Naming ? NEVER put ticket numbers in code identifiers
 
-- **NEVER** put Jira ticket numbers (`PGAS-XXXX`) in method names, DataProvider names, class names, variable names, or constant names.
-- Ticket numbers belong **ONLY** in Javadoc comments and `LOG.info()` messages.
-- **DataProvider name**: `<methodUnderTest>DataProvider` — e.g. method under test `getDCTokenDataAedad` → `getDCTokenDataAedadDataProvider`.
-- **Test method name**: `<methodUnderTest>Test` — e.g. method under test `getDCTokenDataAedad` → `getDCTokenDataAedadTest`.
-- Do **NOT** prefix the test method with `test` (no `testGetDCTokenDataAedad...`). The pattern is strictly `<methodUnderTest>` + suffix (`Test` for the test method, `DataProvider` for the provider).
+- **DataProvider name**: `<methodUnderTest>DataProvider` — e.g. method under test `getDemo` → `getDemoDataProvider`.
+- **Test method name**: `<methodUnderTest>Test` — e.g. method under test `getDemoD` → `getDemoDTest`.
+- Do **NOT** prefix the test method with `test` (no `testGetDemoD...`). The pattern is strictly `<methodUnderTest>` + suffix (`Test` for the test method, `DataProvider` for the provider).
 
 ---
 
 ### 3. NEVER invent methods that don't exist
 
 - Before calling any setter or method on a production class, **read the actual source file** and verify the method exists.
-- When production code uses `ConfigurationUtils.isRetroComp(keyValues, KEY)`, the test must set up a `Map<String, KeyValue>` with real `KeyValue` objects and call `setKeyValues(map)`.
 
 ---
 
@@ -47,8 +42,8 @@ You are a specialized unit testing agent.
 
 ## Canonical style reference (MANDATORY)
 
-- AuthorizationRequestMessageHandlerTestDataProvider
-- AEDMAAuthorizationProcessorTest
+- CheckoutConfigurationTestDataProvider
+- CheckoutConfigurationTest
 
 Includes:
 - HashMap defaults
