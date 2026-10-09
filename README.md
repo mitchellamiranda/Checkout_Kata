@@ -36,11 +36,41 @@ Large-basket scenarios include five million items and deeply overlapping offers.
 `target/site/jacoco/index.html`. JaCoCo enforces 95% line and 90% branch coverage,
 without production exclusions. Compiler warnings fail the build.
 
-### Optional console demo
+### Standalone console demo
 
-After `verify`, run:
+`CheckoutDemo.main` runs without Spring and demonstrates two transactions with
+different caller-supplied rules, using the same factory:
+
+| Transaction | Scanned items | Prices and promotions | Total |
+| --- | --- | --- | --- |
+| Original rules | B A B | A: 50p; B: 75p, two for 125p | 175p |
+| Revised rules | A B A C C A | A: 50p, buy two get one free; B: 150p; C: 50p, two for 75p | 325p |
+
+It prints each scanned SKU and the calculated total. The second transaction
+shows how prices, promotions and catalogue entries can change without rebuilding
+the factory. Each transaction has its own basket and retains its supplied rules.
+
+Run from the repository root:
 
 ```powershell
+.\mvnw.cmd -q compile
+java -cp target\classes com.mitchell.fluro.checkout.demo.CheckoutDemo
+```
+
+The totals are `Money[pence=175]` and `Money[pence=325]`. You can also run
+`CheckoutDemo` directly from your IDE. This demo uses Java-defined rules, not XML.
+
+### Optional Spring console demo
+
+`CheckoutDemoRunner` demonstrates Spring/XML dependency injection and all three
+bundled promotion types. It scans four sample baskets: the first two show
+scan-order independence, the third combines the promotions, and the fourth
+repeats the qualifying quantities.
+
+Build and run from the repository root:
+
+```powershell
+.\mvnw.cmd verify
 java -jar target\checkout-1.0.0-SNAPSHOT.jar --spring.profiles.active=demo --spring.main.banner-mode=off --logging.level.root=ERROR
 ```
 
@@ -53,10 +83,24 @@ A B B C C C C D E -> 550p
 A A B B B B C C C C C C C C D D E E -> 1100p
 ```
 
-Each line uses a new checkout. Prices come from the XML-configured engine, not
-hardcoded results. `DemoContext.xml` enables the runner only under the `demo`
-profile. Without that profile the application initializes and exits without a
-checkout demonstration. The demo requires SKUs A-E; it is not an interactive CLI.
+Spring loads and runs this demo as follows:
+
+1. `CheckoutApplication.main` starts Boot; `CheckoutConfiguration` imports `ApplicationContext.xml`.
+2. The root XML imports `PricingRulesContext.xml`, `CheckoutServicesContext.xml` and `DemoContext.xml`.
+3. The pricing XML defines the items and promotions; constructor autowiring collects all `Item` and `IPromotion` beans into the `pricingRules` snapshot.
+4. With the `demo` profile active, the demo XML injects the factory, rules snapshot and `System.out` into `CheckoutDemoRunner`.
+5. Boot invokes its `CommandLineRunner.run()` method after startup.
+
+Each output line uses `checkoutFactory.create(pricingRules)` to create a fresh
+checkout, scans the sample items and asks the pricing engine for the total.
+The baskets are predefined, but totals are calculated, not hardcoded. All four
+transactions share the injected rules snapshot; the runner does not reload XML.
+
+In the IDE, run `CheckoutApplication.main` with program argument
+`--spring.profiles.active=demo`; the runner has no standalone `main` method.
+Without that profile, the application initializes and exits without running a
+demo. This does not invoke `CheckoutDemo.main`, which remains independent.
+The Spring demo requires SKUs A-E. Neither demo is an interactive CLI.
 
 ## Rules and assumptions
 
@@ -88,8 +132,9 @@ do not consume offers, and scanning can continue afterwards.
 Pass a rules snapshot to each transaction. Plain Java usage:
 
 ```java
-import com.mitchell.fluro.checkout.application.checkout.Checkout;
+import com.mitchell.fluro.checkout.application.checkout.CheckoutFactory;
 import com.mitchell.fluro.checkout.application.checkout.ICheckout;
+import com.mitchell.fluro.checkout.application.checkout.ICheckoutFactory;
 import com.mitchell.fluro.checkout.domain.model.Item;
 import com.mitchell.fluro.checkout.domain.model.Money;
 import com.mitchell.fluro.checkout.domain.pricing.PricingRules;
@@ -104,19 +149,43 @@ var rules = new PricingRules(
         List.of(new Item("A", Money.ofPence(50)), new Item("B", Money.ofPence(75))),
         List.of(new MultiPricePromotion("B", 2, Money.ofPence(125))));
 IPricingEngine engine = new PricingEngine(new PromotionOptimizer());
-ICheckout checkout = new Checkout(rules, engine);
+ICheckoutFactory factory = new CheckoutFactory(engine);
+ICheckout checkout = factory.create(rules);
 checkout.scan("B");
 checkout.scan("A");
 checkout.scan("B");
 Money total = checkout.getTotal(); // 175p
 
 var revisedRules = new PricingRules(List.of(new Item("A", Money.ofPence(60))));
-ICheckout nextTransaction = new Checkout(revisedRules, engine);
+ICheckout nextTransaction = factory.create(revisedRules);
 ```
 
-`PricingRules(items)` enables unit pricing only. Supplying new rules does not
-change an existing transaction. The Spring `ICheckoutFactory` uses its injected
-snapshot for every `create()` call; it does not refresh prices automatically.
+`PricingRules(items)` enables unit pricing only. Every `create(rules)` call
+requires an explicit rules snapshot; there is no no-argument `create()`.
+The factory shares only its injected pricing engine, never a rules snapshot.
+New prices, promotions or catalogue entries apply only to transactions created
+with those rules. Existing transactions retain their original rules, including
+for later scans; null rules are rejected.
+
+The Spring `ICheckoutFactory` uses the same API. Callers can pass the configured
+`pricingRules` bean or supply a new snapshot without rebuilding the factory or
+restarting the application. `new Checkout(rules, engine)` also remains available.
+Loading or refreshing rules is the caller's responsibility.
+
+### Running the snippet
+
+The snippet is a set of statements, not a full program. The domain classes do
+not depend on Spring, so the quickest way to try it is JShell:
+
+```powershell
+.\mvnw.cmd -q compile
+jshell --class-path target\classes
+```
+
+Paste the imports and code into JShell, then enter `total` to see `Money[pence=175]`.
+
+You can also wrap the code in a `public static void main(String[] args)` method
+and run it from your IDE.
 
 ### XML dependency injection
 
@@ -143,11 +212,13 @@ To replace the root without recompiling:
 java -jar target\checkout-1.0.0-SNAPSHOT.jar --checkout.context=file:./config/ApplicationContext.xml
 ```
 
-The external root must define or import its rules and services. Relative imports
-resolve beside that root; `classpath:CheckoutServicesContext.xml` reuses bundled
-services. Import `classpath:DemoContext.xml` and enable `demo` to reuse the demo
-with an alternative A-E catalogue. Missing resources and invalid configuration
-fail startup. XML is trusted application configuration, not untrusted input.
+The external root must define or import its services and any rules used by its
+callers. Relative imports resolve beside that root;
+`classpath:CheckoutServicesContext.xml` reuses bundled services without requiring
+a `pricingRules` bean. Import `classpath:DemoContext.xml` and enable `demo` to
+reuse the demo with an alternative A-E `pricingRules` bean, which the demo requires.
+Missing resources and invalid configuration fail startup. XML is trusted
+application configuration, not untrusted input.
 
 ## Architecture and design decisions
 
@@ -160,7 +231,8 @@ Packages below `com.mitchell.fluro.checkout`:
 | `domain.promotion` | `IPromotion` strategies and `PromotionResult` |
 | `domain.service` | Pricing coordination and exact allocation |
 | `application.checkout` | Checkout API and transaction factory |
-| `infrastructure` | XML bootstrap and optional console adapter |
+| `infrastructure` | XML configuration bootstrap |
+| `demo` | Standalone console demo and optional Spring console runner |
 
 **Strategy and Open/Closed:** Each `IPromotion` returns eligible repeatable
 bundles, not a final discount allocation. Add an implementation and register its
